@@ -12,7 +12,8 @@ from torch import optim, nn
 from torch.nn import functional as F
 from torch.utils import data
 from tqdm import trange
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+from lightning.pytorch import Trainer
 from lightning_hivemind.strategy import HivemindStrategy
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from einops import rearrange
@@ -222,7 +223,7 @@ def main():
         delay_optimizer_step=True,
         offload_optimizer=True,  # required to delay averagin
         host_maddrs= ["/ip4/0.0.0.0/tcp/1337"],
-        initial_peers=[initial_peers] if not initial_peers == "0" else None
+        initial_peers= None, #[initial_peers] if not initial_peers == "0" else None
     )
     visible_addresses = [
             str(a) for a in strategy.dht.get_visible_maddrs()
@@ -230,10 +231,9 @@ def main():
     print(visible_addresses)
 
 
-    diffusion_trainer = pl.Trainer(
+    diffusion_trainer = Trainer(
         devices=args.num_gpus,
         accelerator=accel,
-        # num_nodes = args.num_nodes,
         strategy=strategy,
         precision=16,
         accumulate_grad_batches=args.accum_batches, 
