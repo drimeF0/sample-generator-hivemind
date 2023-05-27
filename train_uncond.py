@@ -13,6 +13,7 @@ from torch.nn import functional as F
 from torch.utils import data
 from tqdm import trange
 import pytorch_lightning as pl
+from lightning_hivemind.strategy import HivemindStrategy
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from einops import rearrange
 import torchaudio
@@ -188,6 +189,8 @@ def main():
     args = get_all_args()
 
     args.latent_dim = 0
+    
+    
 
     save_path = None if args.save_path == "" else args.save_path
 
@@ -208,12 +211,30 @@ def main():
 
     wandb_logger.watch(diffusion_model)
     push_wandb_config(wandb_logger, args)
+    
+    host_maddrs = args.host_maddrs
+    initial_peers = args.initial_peers
+    
+    strategy = HivemindStrategy(
+        target_batch_size=1024,
+        delay_state_averaging=True,
+        delay_grad_averaging=True,
+        delay_optimizer_step=True,
+        offload_optimizer=True,  # required to delay averagin
+        host_maddrs=host_maddrs if host_maddrs is not None else ["/ip4/0.0.0.0/tcp/1337"],
+        initial_peers=initial_peers if initial_peers else None
+    )
+    visible_addresses = [
+            str(a) for a in strategy.dht.get_visible_maddrs()
+        ]
+    print(visible_addresses)
+
 
     diffusion_trainer = pl.Trainer(
         devices=args.num_gpus,
         accelerator="gpu",
         # num_nodes = args.num_nodes,
-        # strategy='ddp',
+        strategy=strategy,
         precision=16,
         accumulate_grad_batches=args.accum_batches, 
         callbacks=[ckpt_callback, demo_callback, exc_callback],
