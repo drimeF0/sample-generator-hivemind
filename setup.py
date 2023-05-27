@@ -16,5 +16,6 @@ setup(
         'torchaudio',
         'tqdm',
         'wandb',
+        'lightning-Hivemind',
     ],
 )
