@@ -212,8 +212,8 @@ def main():
     wandb_logger.watch(diffusion_model)
     push_wandb_config(wandb_logger, args)
     
-    host_maddrs = args.host_maddrs
     initial_peers = args.initial_peers
+    accel = args.acc
     
     strategy = HivemindStrategy(
         target_batch_size=1024,
@@ -221,8 +221,8 @@ def main():
         delay_grad_averaging=True,
         delay_optimizer_step=True,
         offload_optimizer=True,  # required to delay averagin
-        host_maddrs=host_maddrs if host_maddrs is not None else ["/ip4/0.0.0.0/tcp/1337"],
-        initial_peers=initial_peers if initial_peers else None
+        host_maddrs= ["/ip4/0.0.0.0/tcp/1337"],
+        initial_peers=[initial_peers] if not initial_peers == "0" else None
     )
     visible_addresses = [
             str(a) for a in strategy.dht.get_visible_maddrs()
@@ -232,14 +232,14 @@ def main():
 
     diffusion_trainer = pl.Trainer(
         devices=args.num_gpus,
-        accelerator="gpu",
+        accelerator=accel,
         # num_nodes = args.num_nodes,
         strategy=strategy,
         precision=16,
         accumulate_grad_batches=args.accum_batches, 
         callbacks=[ckpt_callback, demo_callback, exc_callback],
         logger=wandb_logger,
-        log_every_n_steps=1,
+        log_every_n_steps=10,
         max_epochs=10000000,
     )
 
