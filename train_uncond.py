@@ -23,7 +23,7 @@ import wandb
 from dataset.dataset import SampleDataset
 
 from audio_diffusion.models import DiffusionAttnUnet1D
-from audio_diffusion.utils import ema_update
+#from audio_diffusion.utils import ema_update
 from viz.viz import audio_spectrogram_image
 
 
@@ -93,7 +93,7 @@ class DiffusionUncond(pl.LightningModule):
         super().__init__()
 
         self.diffusion = DiffusionAttnUnet1D(global_args, io_channels=2, n_attn_layers=4)
-        self.diffusion_ema = deepcopy(self.diffusion)
+        #self.diffusion_ema = deepcopy(self.diffusion)
         self.rng = torch.quasirandom.SobolEngine(1, scramble=True, seed=global_args.seed)
         self.ema_decay = global_args.ema_decay
         
@@ -133,7 +133,7 @@ class DiffusionUncond(pl.LightningModule):
 
     def on_before_zero_grad(self, *args, **kwargs):
         decay = 0.95 if self.current_epoch < 25 else self.ema_decay
-        ema_update(self.diffusion, self.diffusion_ema, decay)
+        #ema_update(self.diffusion, self.diffusion_ema, decay)
 
 class ExceptionCallback(pl.Callback):
     def on_exception(self, trainer, module, err):
@@ -163,7 +163,7 @@ class DemoCallback(pl.Callback):
         noise = torch.randn([self.num_demos, 2, self.demo_samples]).to(module.device)
 
         try:
-            fakes = sample(module.diffusion_ema, noise, self.demo_steps, 0)
+            fakes = sample(module.diffusion, noise, self.demo_steps, 0)
 
             # Put the demos together
             fakes = rearrange(fakes, 'b d n -> d (b n)')
@@ -216,25 +216,25 @@ def main():
     initial_peers = args.initial_peers
     accel = args.acc
     
-    strategy = HivemindStrategy(
-        target_batch_size=1024,
-        delay_state_averaging=True,
-        delay_grad_averaging=True,
-        delay_optimizer_step=True,
-        offload_optimizer=True,  # required to delay averagin
-        host_maddrs= ["/ip4/0.0.0.0/tcp/1337"],
-        initial_peers= None, #[initial_peers] if not initial_peers == "0" else None
-    )
-    visible_addresses = [
-            str(a) for a in strategy.dht.get_visible_maddrs()
-        ]
-    print(visible_addresses)
+    # strategy = HivemindStrategy(
+    #     target_batch_size=1024,
+    #     delay_state_averaging=True,
+    #     delay_grad_averaging=True,
+    #     delay_optimizer_step=True,
+    #     offload_optimizer=True,  # required to delay averagin
+    #     host_maddrs= ["/ip4/0.0.0.0/tcp/1337"],
+    #     initial_peers= None, #[initial_peers] if not initial_peers == "0" else None
+    # )
+    # visible_addresses = [
+    #         str(a) for a in strategy.dht.get_visible_maddrs()
+    #     ]
+    # print(visible_addresses)
 
 
     diffusion_trainer = Trainer(
         devices=args.num_gpus,
         accelerator=accel,
-        strategy=strategy,
+        #strategy=strategy,
         precision=16,
         accumulate_grad_batches=args.accum_batches, 
         callbacks=[ckpt_callback, demo_callback, exc_callback],
@@ -243,7 +243,7 @@ def main():
         max_epochs=10000000,
     )
 
-    diffusion_trainer.fit(diffusion_model, train_dl, ckpt_path=args.ckpt_path)
+    diffusion_trainer.fit(diffusion_model, train_dl)#ckpt_path=args.ckpt_path)
 
 if __name__ == '__main__':
     main()
